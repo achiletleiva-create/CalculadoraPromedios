@@ -1,147 +1,374 @@
 // Constante para la nota mínima de aprobación
 const NOTA_MINIMA_APROBACION = 14; 
 
-// Función para obtener valores y validar rangos (0-20 para notas, 0-100 para porcentaje)
+// -------------------------------------------------------------------
+// FUNCIONES DE UTILIDAD
+// -------------------------------------------------------------------
+
 function obtenerValor(id) {
     const input = document.getElementById(id);
     let valor = parseFloat(input.value);
 
-    // Si es %CISCO, el máximo es 100
+    // Validación de rango
     if (id === 'cisco') {
         if (isNaN(valor) || valor < 0) valor = 0;
         else if (valor > 100) valor = 100;
-    } 
-    // Para todas las demás notas, el máximo es 20
-    else {
+    } else {
         if (isNaN(valor) || valor < 0) valor = 0;
         else if (valor > 20) valor = 20;
     }
     
-    // Actualizar el input con el valor validado
-    input.value = valor;
+    // Solo actualizar el valor si no está deshabilitado
+    if (!input.disabled) {
+        input.value = valor;
+    } else {
+        // Si está deshabilitado por cualquier razón, forzamos el valor a 0 en el modelo de datos
+        // para que no afecte el cálculo si el bloqueo sigue activo.
+        valor = 0; 
+    }
+    
     return valor;
 }
 
+/**
+ * Gestiona el chequeo mutuo de las casillas de bonificación y bloquea los campos de cálculo manual.
+ * @param {string} idMarcado - El ID de la casilla que se acaba de marcar.
+ */
+function manejarBonificaciones(idMarcado) {
+    const opcion3 = document.getElementById('opcion3cursos');
+    const opcion2 = document.getElementById('opcion2cursos');
+    const ciscoInput = document.getElementById('cisco');
+    const blackbInput = document.getElementById('exblackb');
+
+    // 1. Manejo Exclusivo (Solo una puede estar marcada)
+    if (idMarcado === 'opcion3cursos' && opcion3.checked) {
+        opcion2.checked = false;
+    } else if (idMarcado === 'opcion2cursos' && opcion2.checked) {
+        opcion3.checked = false;
+    }
+
+    // 2. Bloqueo/Desbloqueo de campos CISCO/BLACKB
+    const bonificado = opcion3.checked || opcion2.checked;
+
+    // Solo bloquear/desbloquear si NO estamos en un bloqueo total (si no hay bloqueo total, se usa esta lógica)
+    if (!document.body.classList.contains('bloqueo-total')) {
+        ciscoInput.disabled = bonificado;
+        blackbInput.disabled = bonificado;
+
+        // Si están bloqueados por bonificación, resetear sus valores a 0 
+        if (bonificado) {
+            ciscoInput.value = 0;
+            blackbInput.value = 0;
+        }
+    }
+
+    // Volver a calcular para aplicar los cambios inmediatamente
+    calcularPromedio(); 
+}
+
+/**
+ * Bloquea TODAS las casillas de entrada **QUE NO DEFIENDEN LA ESPERANZA** si la aprobación es imposible.
+ * @param {boolean} bloquear - True para bloquear, False para desbloquear.
+ */
+function manejarBloqueoTotal(bloquear) {
+    const inputs_a_bloquear = ['cisco', 'exblackb', 'ef']; // Solo bloqueamos estas tres
+    const checkboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
+    
+    // Toggle de clase en el body
+    if (bloquear) {
+        document.body.classList.add('bloqueo-total');
+    } else {
+        document.body.classList.remove('bloqueo-total');
+    }
+    
+    // 1. Bloqueamos/Desbloqueamos notas numéricas posteriores
+    inputs_a_bloquear.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.disabled = bloquear;
+            // Si estamos bloqueando, forzamos el valor a 0 para el cálculo actual
+            if (bloquear) {
+                 input.value = 0;
+            }
+        }
+    });
+
+    // 2. Bloqueamos/Desbloqueamos los checkboxes de bonificación
+    checkboxes.forEach(checkbox => {
+        checkbox.disabled = bloquear;
+        // Si estamos bloqueando, desmarcamos los checkboxes para no aplicar el bono
+        if (bloquear) {
+             checkbox.checked = false;
+        }
+    });
+    
+    // 3. Si no estamos en bloqueo total, re-aplicamos la lógica de bonificación
+    if (!bloquear) {
+        const opcion3 = document.getElementById('opcion3cursos');
+        const opcion2 = document.getElementById('opcion2cursos');
+        const ciscoInput = document.getElementById('cisco');
+        const blackbInput = document.getElementById('exblackb');
+        
+        const bonificado = opcion3.checked || opcion2.checked;
+        ciscoInput.disabled = bonificado;
+        blackbInput.disabled = bonificado;
+    }
+}
+
+
+/**
+ * Calcula las notas base, la Nota PA3, y aplica las bonificaciones.
+ * @returns {object} Un objeto con todas las notas base y ajustadas.
+ */
+function obtenerNotasAjustadas() {
+    const PA1 = obtenerValor('pa1');
+    const PA2 = obtenerValor('pa2');
+    const EP = obtenerValor('ep');
+
+    // Los demás valores pueden ser 0 si han sido deshabilitados/bloqueados
+    const PERC_CISCO = obtenerValor('cisco'); 
+    const EXBLACKB = obtenerValor('exblackb');
+    let EF = obtenerValor('ef'); // Nota EF base
+
+    // Lógica para Bonificación (basada en el estado actual del checkbox)
+    const opcion3cursos = document.getElementById('opcion3cursos').checked;
+    const opcion2cursos = document.getElementById('opcion2cursos').checked;
+    
+    // CÁLCULO BASE DE PA3
+    const Nota_CISCO_Base = (PERC_CISCO * 20) / 100;
+    const PA3_Calculada = (Nota_CISCO_Base + EXBLACKB) / 2;
+    let Nota_PA3_Original = Math.min(PA3_Calculada, 20); 
+
+    let Nota_PA3_Ajustada = Nota_PA3_Original;
+    let bonificacionEF = 0;
+    
+    document.getElementById('bonificacionEF').innerHTML = '';
+
+    // APLICACIÓN DE BONIFICACIONES (Sobreescribe PA3 y EF)
+    if (opcion3cursos) {
+        Nota_PA3_Ajustada = 20;
+        bonificacionEF = 2;
+        document.getElementById('bonificacionEF').innerHTML = `<div class="mensaje-bono-ef">**¡Bonificación EF!** Se añaden +2 puntos a tu Examen Final.</div>`;
+    } else if (opcion2cursos) {
+        Nota_PA3_Ajustada = 16;
+        bonificacionEF = 0;
+    }
+    
+    let EF_Ajustado = Math.min(EF + bonificacionEF, 20);
+    
+    // CÁLCULOS FINALES CON NOTAS AJUSTADAS
+    const M1 = (PA1 * 0.40) + (EP * 0.60);
+    const M2 = (PA2 * 0.30) + (Nota_PA3_Ajustada * 0.10) + (EF_Ajustado * 0.60);
+    
+    let PF_Bruto = (M1 + M2) / 2;
+
+    let PF_Final = PF_Bruto;
+    if (PF_Bruto >= 13.5) {
+        PF_Final = NOTA_MINIMA_APROBACION; 
+    } else {
+        PF_Final = Math.floor(PF_Bruto);
+    }
+
+    // MOSTRAR CÁLCULOS INTERMEDIOS
+    document.getElementById('resultadoNotaCisco').textContent = Nota_CISCO_Base.toFixed(2);
+    document.getElementById('resultadoNotaPA3').textContent = Nota_PA3_Ajustada.toFixed(2);
+    
+    return { M1, M2, PF_Bruto, PF_Final, PA1, PA2, PERC_CISCO, EXBLACKB, EP, EF_Ajustado, Nota_PA3_Ajustada, EF };
+}
+
 // -------------------------------------------------------------------
-// 1. FUNCIÓN DE CÁLCULO DE PROMEDIOS (SE EJECUTA AL PRESIONAR EL BOTÓN)
+// 1. FUNCIÓN PRINCIPAL DE CÁLCULO Y ANÁLISIS
 // -------------------------------------------------------------------
 
 function calcularPromedio() {
-    // A. Obtener valores de entrada
-    const PA1 = obtenerValor('pa1');
-    const PA2 = obtenerValor('pa2');
-    const PERC_CISCO = obtenerValor('cisco'); 
-    const EXBLACKB = obtenerValor('exblackb');
-    const EP = obtenerValor('ep');
-    const EF = obtenerValor('ef');
+    // 0. Obtener M1 y PA2 (estos inputs nunca se bloquean, por lo que son seguros)
+    const PA1_val = obtenerValor('pa1');
+    const EP_val = obtenerValor('ep');
+    const PA2_val = obtenerValor('pa2');
+    const M1_Calculado = (PA1_val * 0.40) + (EP_val * 0.60);
+    
+    // Asumimos PA3_Ajustada como 20 (máximo potencial) para el chequeo de bloqueo más estricto
+    const Nota_PA3_Max_Chequeo = 20; 
 
-    // B. Cálculo de M1 y PA3
-    const M1 = (PA1 * 0.40) + (EP * 0.60);
-    const Nota_CISCO_Base = (PERC_CISCO * 20) / 100;
-    const PA3_Calculada = (Nota_CISCO_Base + EXBLACKB) / 2;
-    const Nota_PA3 = Math.min(PA3_Calculada, 20); 
+    // 1. Evaluar Bloqueo Total (Con M1 y PA2 actuales, y asumiendo lo MEJOR en lo que falta)
+    const PF_Maximo_Actual = calcularPFMaximoParcial(M1_Calculado, PA2_val, Nota_PA3_Max_Chequeo);
+    const bloqueoTotalNecesario = (PF_Maximo_Actual < 13.5);
+    
+    manejarBloqueoTotal(bloqueoTotalNecesario);
 
-    // C. Cálculo de M2 y PF
-    const M2 = (PA2 * 0.30) + (Nota_PA3 * 0.10) + (EF * 0.60);
-    let PF_Bruto = (M1 + M2) / 2;
+    // 2. Recalcular todas las notas con el estado de bloqueo aplicado
+    const notas = obtenerNotasAjustadas();
+    const { M1, M2, PF_Final, PERC_CISCO, EXBLACKB, EF } = notas;
 
-    // D. Aplicar Reglas de Redondeo y Mostrar Resultados
+    // A. Mostrar Resultados
     document.getElementById('resultadoM1').textContent = M1.toFixed(2);
     document.getElementById('resultadoM2').textContent = M2.toFixed(2);
-    
-    // El Promedio Final (PF) se redondea a Entero si es >= 13.5
-    let PF_Final = PF_Bruto;
-    if (PF_Bruto >= 13.5 && PF_Bruto < 14) {
-        PF_Final = NOTA_MINIMA_APROBACION; // Redondea a 14
-    } else {
-        PF_Final = Math.round(PF_Bruto); // Para todos los demás casos, redondeo estándar
-    }
-    
-    // Mostrar PF (Entero, pero el usuario debe ver que la base fue de 13.5 para que suba a 14)
     document.getElementById('resultadoPF').textContent = PF_Final.toFixed(0); 
 
-    // E. Determinar estado de aprobación
+    // B. Limpiar Mensajes y Estados
+    document.getElementById('mensajeAyuda').innerHTML = ''; 
+    document.getElementById('analisisEsperanza').innerHTML = '';
+    document.getElementById('mensajeMinimoM1').innerHTML = '';
     const estadoElement = document.getElementById('estadoAprobacion');
     estadoElement.classList.remove('aprobado', 'desaprobado', 'simulacion');
+    estadoElement.textContent = '';
     
+    // ----------------------------------------------------------------
+    // PASO 1 y 2: ANÁLISIS DE M1 (Mínimo requerido para aprobar)
+    // ----------------------------------------------------------------
+    const M1_min_requerido = (13.5 * 2) - 20; 
+    
+    if (M1 < M1_min_requerido) {
+        document.getElementById('mensajeMinimoM1').innerHTML = `
+            <div class="alerta-imposible">
+                **🚨 M1 crítico.** Tu M1 (${M1.toFixed(2)}) es tan bajo que la aprobación final es imposible, aunque saques 20 en M2.
+            </div>
+        `;
+    } else {
+        const M2_Necesario = (13.5 * 2) - M1;
+         document.getElementById('mensajeMinimoM1').innerHTML = `
+            <div class="alerta-aprobacion">
+                **✅ M1 aceptable.** Para aprobar, tu **M2** necesita ser al menos **${M2_Necesario.toFixed(2)}**.
+            </div>
+        `;
+    }
+
+    // ----------------------------------------------------------------
+    // PASO 3: ANÁLISIS DE ESPERANZA/BLOQUEO (Muestra el mensaje de bloqueo total)
+    // ----------------------------------------------------------------
+    
+    if (bloqueoTotalNecesario) {
+        document.getElementById('analisisEsperanza').innerHTML = `
+            <div class="alerta-imposible">
+                **⛔ BLOQUEO DE ESPERANZA:** Con tus notas ingresadas, tu promedio final máximo posible es ${PF_Maximo_Actual.toFixed(2)}. Es imposible alcanzar 14.
+            </div>
+        `;
+        // Resultado final (desaprobación)
+        estadoElement.textContent = `🚫 Resultado: Imposible Aprobar. PF Máximo: ${PF_Maximo_Actual.toFixed(0)}.`;
+        estadoElement.classList.add('desaprobado');
+        return; // Terminamos la ejecución si hay bloqueo total
+    } 
+    // Si la esperanza existe, mostramos un mensaje de aliento/recordatorio si ya se ingresó PA2
+    else if (PA2_val > 0) { 
+         document.getElementById('analisisEsperanza').innerHTML = `
+            <div class="alerta-aprobacion">
+                **💡 ANALIZA:** Tu M1 y PA2 te permiten aprobar. Sigue concentrado en lo que falta.
+            </div>
+        `;
+    }
+
+
+    // ----------------------------------------------------------------
+    // RESULTADO FINAL (Solo si la esperanza no ha sido bloqueada)
+    // ----------------------------------------------------------------
+
+    // C. Lógica de Aprobación
     if (PF_Final >= NOTA_MINIMA_APROBACION) {
         estadoElement.textContent = `¡Felicidades! Aprobaste con ${PF_Final.toFixed(0)}. 🎉`;
         estadoElement.classList.add('aprobado');
-    } else {
-        // Si no aprueba, pasamos al análisis de simulación
-        const analisis = simularAprobacion(M1);
-        
-        if (analisis.puedeAprobar) {
-            estadoElement.textContent = `🚨 Necesitas ${analisis.PF_Necesario.toFixed(2)} para aprobar. ¡Aún puedes lograrlo!`;
-            estadoElement.classList.add('simulacion');
-            // Llamamos a una función para mostrar el mensaje de ayuda
-            mostrarMensajeAyuda(PF_Bruto, analisis.PF_Necesario);
+        return;
+    }
 
-        } else {
-            estadoElement.textContent = `⚠️ **Notas muy bajas.** Con tu M1 (${M1.toFixed(2)}), es imposible aprobar (mínimo ${NOTA_MINIMA_APROBACION}). Tu nota máxima es ${analisis.PF_Maximo.toFixed(2)}.`;
-            estadoElement.classList.add('desaprobado');
-            mostrarMensajeAyuda(PF_Bruto, 0, false);
-        }
+    // D. Detección de notas faltantes (Simulación de Recuperación)
+    const opcion3 = document.getElementById('opcion3cursos');
+    const opcion2 = document.getElementById('opcion2cursos');
+    const hayBonificacion = opcion3.checked || opcion2.checked;
+    
+    let notasFaltantes = PA2_val === 0 || EF === 0; // EF es la nota base (sin bono)
+
+    if (!hayBonificacion) {
+        // Solo chequeamos CISCO/BLACKB si no hay bonificación
+        notasFaltantes = notasFaltantes || PERC_CISCO === 0 || EXBLACKB === 0;
+    }
+
+    const analisisM1 = simularAprobacionM1(M1); 
+
+    if (notasFaltantes) {
+        // Si faltan notas y el resultado actual es reprobatorio
+        estadoElement.textContent = `🚨 Tu promedio actual es ${PF_Final}. ¡Aún tienes opciones de aprobar!`;
+        estadoElement.classList.add('simulacion');
+        mostrarMensajeAyudaFinal(M1, analisisM1.PF_Necesario);
+    } 
+    // E. Si NO faltan notas (todas > 0) Y PF es reprobatorio (FINALIZACIÓN)
+    else if (EF > 0 && PF_Final < NOTA_MINIMA_APROBACION) {
+        // Se muestra directamente el mensaje de desaprobación final
+        estadoElement.textContent = `😭 **FINAL DEL PROMEDIO:** Tu Promedio Final (${PF_Final}) no alcanza el mínimo de 14. Debes consultar el proceso de subsanación.`;
+        estadoElement.classList.add('desaprobado');
+        mostrarMensajeAyudaFinal(M1, 0, false); 
     }
 }
 
 // -------------------------------------------------------------------
-// 2. FUNCIÓN DE SIMULACIÓN (ANÁLISIS DE APROBACIÓN)
+// 2. FUNCIONES DE SIMULACIÓN Y BLOQUEO
 // -------------------------------------------------------------------
 
-function simularAprobacion(M1) {
-    // A. Calcular el Promedio Final Máximo posible
-    // Asumimos M2 máximo = 20 (PA2=20, PA3=20, EF=20)
-    // El M2 máximo es siempre 20 si todas las notas son 20.
+/**
+ * Calcula el PF Máximo posible asumiendo 20 en las notas faltantes.
+ * @param {number} M1 - Promedio M1 (ya calculado).
+ * @param {number} PA2 - Nota de PA2.
+ * @param {number} Nota_PA3_Max_Chequeo - Nota de PA3 (20 en este caso para chequeo de máxima esperanza).
+ * @returns {number} PF Máximo Posible.
+ */
+function calcularPFMaximoParcial(M1, PA2, Nota_PA3_Max_Chequeo) {
+    let M2_Maximo_Parcial = 0;
+    
+    // 1. Considerar PA2 (30% de M2)
+    M2_Maximo_Parcial += PA2 * 0.30;
+    
+    // 2. Considerar PA3 (10% de M2) - Usamos Nota_PA3_Max_Chequeo (20) para el análisis de bloqueo
+    M2_Maximo_Parcial += Nota_PA3_Max_Chequeo * 0.10;
+    
+    // 3. Considerar EF (60% de M2) - Asumimos 20 + 2 de bono máximo (truncado a 20)
+    let EF_Maximo_Teorico = 20 + 2; 
+    EF_Maximo_Teorico = Math.min(EF_Maximo_Teorico, 20);
+
+    M2_Maximo_Parcial += EF_Maximo_Teorico * 0.60;
+
+    const M2_Maximo = Math.min(M2_Maximo_Parcial, 20); 
+
+    // PF Máximo:
+    return (M1 + M2_Maximo) / 2;
+}
+
+/**
+ * Análisis de Esperanza basado solo en M1 (para el mensaje final de ayuda).
+ * @param {number} M1 - Promedio M1.
+ */
+function simularAprobacionM1(M1) {
     const M2_Maximo = 20; 
     const PF_Maximo = (M1 + M2_Maximo) / 2;
-
-    // B. Determinar si Aprobación es posible
-    const puedeAprobar = (PF_Maximo >= 14);
-
-    // C. Calcular el M2 que se necesita para obtener PF = 14
-    // PF = (M1 + M2) / 2  =>  28 = M1 + M2  =>  M2_Necesario = 28 - M1
-    const M2_Necesario = (NOTA_MINIMA_APROBACION * 2) - M1; 
-
-    // D. Calcular el PF necesario para redondear a 14 (PF >= 13.5)
-    // Si la nota real requerida es 13.5, necesitamos que M1 + M2 sea 27.
-    const PF_Necesario_Bruto = (13.5 * 2) - M1;
+    const puedeAprobar = (PF_Maximo >= 13.5); 
     
     return {
-        M2_Necesario: M2_Necesario,
-        PF_Necesario: PF_Necesario_Bruto / 2, // Lo mostramos en formato PF
+        PF_Necesario: 13.5, 
         PF_Maximo: PF_Maximo,
-        puedeAprobar: puedeAprobar
+        puedeAprobacion: puedeAprobar
     };
 }
 
 
 // -------------------------------------------------------------------
-// 3. FUNCIÓN PARA MOSTRAR MENSAJES DE AYUDA / ALERTA
+// 3. FUNCIÓN PARA MOSTRAR MENSAJES DE AYUDA / ALERTA FINAL
 // -------------------------------------------------------------------
 
-function mostrarMensajeAyuda(PF_Actual, PF_Necesario, puedeAprobar = true) {
+function mostrarMensajeAyudaFinal(M1, PF_Necesario, puedeAprobar = true) {
     const contenedor = document.getElementById('mensajeAyuda');
-    if (!contenedor) return; // Asegura que el contenedor exista
-
+    const Nota_PA3_Ajustada = obtenerNotasAjustadas().Nota_PA3_Ajustada;
+    
     if (puedeAprobar) {
-        // Si aún puede aprobar, calculamos la nota M2 que necesita
-        const M2_Requerido = (13.5 * 2) - obtenerValor('pa1') * 0.40 - obtenerValor('ep') * 0.60;
+        const M2_Requerido = (13.5 * 2) - M1; 
         
         contenedor.innerHTML = `
             <div class="alerta-aprobacion">
-                <p>💡 **ANÁLISIS DE RECUPERACIÓN**</p>
-                <p>Para alcanzar el mínimo aprobatorio (14), necesitas un Promedio Final de **13.5** (por la regla de redondeo).</p>
-                <p>Esto implica que tu **Módulo 2 (M2)** debe ser, como mínimo, **${(M2_Requerido / 0.6).toFixed(2)}**</p>
-                <p>Si obtienes el M2 requerido, tu PF será: ${PF_Necesario.toFixed(2)} **→ 14**</p>
+                <p>💡 **OPCIONES DE RECUPERACIÓN**</p>
+                <p>Tu **M2** debe ser **${M2_Requerido.toFixed(2)}** o más para que tu PF alcance ${PF_Necesario.toFixed(2)} y redondee a ${NOTA_MINIMA_APROBACION}.</p>
             </div>
         `;
     } else {
-        // Mensaje de advertencia de imposibilidad
         contenedor.innerHTML = `
             <div class="alerta-imposible">
-                <p>⛔ **¡ATENCIÓN!**</p>
-                <p>Con tus notas actuales en M1, incluso sacando 20 en todas las evaluaciones restantes (PA2, %CISCO, EXBLACKB., EF), no alcanzas el 14. Debes consultar con tu docente.</p>
+                <p>⛔ **FIN DE OPCIONES**</p>
+                <p>Tu PF máximo posible es **${calcularPFMaximoParcial(M1, obtenerValor('pa2'), 20).toFixed(2)}**. No es suficiente. Consulta con tu docente.</p>
             </div>
         `;
     }
@@ -149,17 +376,34 @@ function mostrarMensajeAyuda(PF_Actual, PF_Necesario, puedeAprobar = true) {
 
 
 // -------------------------------------------------------------------
-// 4. INICIALIZACIÓN (Asegurarse de que el contenedor de ayuda esté en el HTML)
+// 4. FUNCIÓN PARA LIMPIAR LOS CAMPOS
+// -------------------------------------------------------------------
+
+function limpiarCampos() {
+    // Desbloqueo primero para asegurar que todos los campos se reseteeen
+    manejarBloqueoTotal(false);
+    
+    document.querySelectorAll('input[type="number"]').forEach(input => {
+        input.value = 0;
+        input.disabled = false;
+    });
+    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = false;
+        checkbox.disabled = false;
+    });
+    calcularPromedio(); 
+}
+
+
+// -------------------------------------------------------------------
+// 5. INICIALIZACIÓN
 // -------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Añadimos un contenedor para el mensaje de ayuda debajo de los resultados
-    const resultsSection = document.querySelector('.results-section');
-    if (resultsSection) {
-        const divAyuda = document.createElement('div');
-        divAyuda.id = 'mensajeAyuda';
-        resultsSection.parentNode.insertBefore(divAyuda, resultsSection.nextSibling);
-    }
-    
+    // Permite que el cálculo se actualice al cambiar cualquier nota o checkbox
+    document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', calcularPromedio);
+    });
+    // Cálculo inicial al cargar la página
     calcularPromedio();
 });

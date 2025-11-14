@@ -1,15 +1,16 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calculadora de Promedios UCV</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css"> 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header class="header">
+            <img src="ruta/a/tu/logo-ucv.png" alt="Logo UCV" class="logo-ucv">
             <h1 class="title">Calculadora de Promedios <span class="highlight">UCV</span></h1>
             <p class="subtitle">Ingeniería / Arquitectura</p>
         </header>
@@ -17,55 +18,24 @@
         <main class="calculator-card">
             <p class="docente-info">Diseñada por el Docente: **Ing. Anthony R. Chilet Leiva**</p>
             
-            <section class="input-section">
-                <h2>📊 Ingresa tus Notas</h2>
-                <div class="input-grid">
-                    <div class="input-group">
-                        <label for="pa1">PA1 (40% M1)</label>
-                        <input type="number" id="pa1" min="0" max="20" step="0.1" value="0">
-                    </div>
-                    <div class="input-group">
-                        <label for="ep">Examen Parcial (EP - 60% M1)</label>
-                        <input type="number" id="ep" min="0" max="20" step="0.1" value="0">
-                    </div>
-                    <div class="input-group">
-                        <label for="pa2">PA2 (30% M2)</label>
-                        <input type="number" id="pa2" min="0" max="20" step="0.1" value="0">
-                    </div>
-                    <div class="input-group">
-                        <label for="ef">Examen Final (EF - 60% M2)</label>
-                        <input type="number" id="ef" min="0" max="20" step="0.1" value="0">
-                    </div>
-                    <div class="input-group">
-                        <label for="cisco">% CISCO (20% de PA3)</label>
-                        <input type="number" id="cisco" min="0" max="20" step="0.1" value="0">
-                    </div>
-                    <div class="input-group">
-                        <label for="exblackb">Examen Blackboard (80% de PA3)</label>
-                        <input type="number" id="exblackb" min="0" max="20" step="0.1" value="0">
-                    </div>
-                </div>
-            </section>
-            
-            <button onclick="calcularPromedio()">Calcular Promedio Final</button>
-
+            <div class="button-group">
+                <button class="calculate-button" onclick="calcularPromedio()">Calcular Promedio Final</button>
+                <button class="clear-button" onclick="limpiarCampos()">🗑️ Limpiar Notas</button>
+            </div>
             <section class="results-section">
-                <h2>📈 Resultados</h2>
+                <h2>📈 Resultados Finales</h2>
                 <div class="results-grid">
-                    <div class="result-box">
-                        <p class="result-label">Promedio Módulo 1 (M1)</p>
-                        <p id="resultadoM1" class="result-value">0.00</p>
-                    </div>
                     <div class="result-box">
                         <p class="result-label">Promedio Módulo 2 (M2)</p>
                         <p id="resultadoM2" class="result-value">0.00</p>
                     </div>
                     <div class="result-box final">
                         <p class="result-label">Promedio Final (PF)</p>
-                        <p id="resultadoPF" class="result-value final-value">0.00</p>
+                        <p id="resultadoPF" class="result-value final-value">0</p>
                     </div>
                 </div>
                 <p id="estadoAprobacion" class="status-message"></p>
+                <div id="mensajeAyuda"></div> 
             </section>
         </main>
         
@@ -73,7 +43,6 @@
             <p>Simulador de Notas con fines académicos. Consulta la normatividad oficial de la UCV.</p>
         </footer>
     </div>
-    <script src="script.js"></script>
+    <script src="script.js"></script> 
 </body>
 </html>
-
