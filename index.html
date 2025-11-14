@@ -10,13 +10,98 @@
 <body>
     <div class="container">
         <header class="header">
-            <img src="ruta/a/tu/logo-ucv.png" alt="Logo UCV" class="logo-ucv">
             <h1 class="title">Calculadora de Promedios <span class="highlight">UCV</span></h1>
             <p class="subtitle">Ingeniería / Arquitectura</p>
         </header>
 
         <main class="calculator-card">
             <p class="docente-info">Diseñada por el Docente: **Ing. Anthony R. Chilet Leiva**</p>
+            
+            <section class="input-section block-section">
+                <h2>1. Notas del Módulo 1 (M1)</h2>
+                <div class="input-grid grid-2">
+                    <div class="input-group">
+                        <label for="pa1">PA1 (40% M1)</label>
+                        <input type="number" id="pa1" min="0" max="20" step="0.1" value="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="ep">Examen Parcial (EP - 60% M1)</label>
+                        <input type="number" id="ep" min="0" max="20" step="0.1" value="0">
+                    </div>
+                </div>
+
+                <div class="result-m1">
+                    <div class="result-box half-width">
+                        <p class="result-label">Promedio Módulo 1 (M1)</p>
+                        <p id="resultadoM1" class="result-value">0.00</p>
+                    </div>
+                    <div id="mensajeMinimoM1"></div> 
+                </div>
+            </section>
+            
+            <section class="input-section block-section">
+                <h2>2. Nota del PA2 (30% M2)</h2>
+                <div class="input-grid grid-1">
+                    <div class="input-group">
+                        <label for="pa2">PA2 (30% M2)</label>
+                        <input type="number" id="pa2" min="0" max="20" step="0.1" value="0">
+                    </div>
+                </div>
+
+                <div id="analisisEsperanza"></div> 
+            </section>
+            
+            <section class="input-section block-section bonus-section">
+                <h2>3. Bonificación y Exención PA3 (Cursos Adicionales)</h2>
+                <div class="input-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="opcion3cursos" onclick="manejarBonificaciones('opcion3cursos')">
+                        **Opción 1: CISCO + 2 Cursos Adicionales** (PA3=20 & Bonificación EF=+2 pts)
+                    </label>
+                </div>
+                <div class="input-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="opcion2cursos" onclick="manejarBonificaciones('opcion2cursos')">
+                        **Opción 2: CISCO + 1 Curso Adicional** (PA3=16)
+                    </label>
+                </div>
+            </section>
+
+            <section class="input-section block-section" id="seccionCalculoPA3">
+                <h2>4. Cálculo Manual del Promedio PA3 (10% M2)</h2>
+                <p class="nota-guia">Rellena esta sección **solo** si NO marcaste una opción de bonificación.</p>
+                <div class="input-grid grid-3">
+                    <div class="input-group">
+                        <label for="cisco">% CISCO (0-100)</label>
+                        <input type="number" id="cisco" min="0" max="100" step="0.1" value="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="exblackb">Examen Blackboard (Nota sobre 20)</label>
+                        <input type="number" id="exblackb" min="0" max="20" step="0.1" value="0">
+                    </div>
+                    <div class="result-box intermediate-box">
+                        <p class="result-label">Nota Base CISCO (20)</p>
+                        <p id="resultadoNotaCisco" class="result-value">0.00</p>
+                    </div>
+                </div>
+
+                <div class="result-m1">
+                    <div class="result-box half-width">
+                        <p class="result-label">Promedio PA3</p>
+                        <p id="resultadoNotaPA3" class="result-value">0.00</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="input-section block-section">
+                <h2>5. Examen Final (60% M2)</h2>
+                <div class="input-grid grid-1">
+                    <div class="input-group">
+                        <label for="ef">Examen Final (EF - 60% M2)</label>
+                        <input type="number" id="ef" min="0" max="20" step="0.1" value="0">
+                    </div>
+                </div>
+                <div id="bonificacionEF"></div> </section>
             
             <div class="button-group">
                 <button class="calculate-button" onclick="calcularPromedio()">Calcular Promedio Final</button>
