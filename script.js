@@ -5,29 +5,59 @@ const NOTA_MINIMA_APROBACION = 14;
 // FUNCIONES DE UTILIDAD
 // -------------------------------------------------------------------
 
+/**
+ * Obtiene el valor de un input, convierte coma a punto, valida el rango y redondea a 2 decimales.
+ * @param {string} id - El ID del elemento input.
+ * @returns {number} El valor numérico limpio, limitado y redondeado.
+ */
 function obtenerValor(id) {
     const input = document.getElementById(id);
-    let valor = parseFloat(input.value);
+    let valorString = input.value;
+    
+    // Si está deshabilitado o vacío, retorna 0.00 para el cálculo. 
+    // NO se modifica el input.value aquí si está vacío.
+    if (input.disabled || valorString.trim() === '') {
+        return 0;
+    }
+    
+    // 1. Reemplazar coma por punto para el cálculo
+    valorString = valorString.replace(',', '.');
+    
+    let valor = parseFloat(valorString);
+    
+    // Si no es un número válido, retorna 0 y limpia visualmente el input.
+    if (isNaN(valor)) {
+        input.value = '';
+        return 0;
+    }
+    
+    let valorLimitado = valor;
 
-    // Validación de rango
+    // 2. Validación y limitación de rango
     if (id === 'cisco') {
-        if (isNaN(valor) || valor < 0) valor = 0;
-        else if (valor > 100) valor = 100;
+        if (valorLimitado < 0) valorLimitado = 0;
+        else if (valorLimitado > 100) valorLimitado = 100;
     } else {
-        if (isNaN(valor) || valor < 0) valor = 0;
-        else if (valor > 20) valor = 20;
+        // Aplica para todas las notas de 0 a 20 
+        if (valorLimitado < 0) valorLimitado = 0;
+        else if (valorLimitado > 20) valorLimitado = 20;
     }
     
-    // Solo actualizar el valor si no está deshabilitado
-    if (!input.disabled) {
-        input.value = valor;
-    } else {
-        // Si está deshabilitado por cualquier razón, forzamos el valor a 0 en el modelo de datos
-        // para que no afecte el cálculo si el bloqueo sigue activo.
-        valor = 0; 
+    // 3. Redondeo a 2 decimales para el cálculo
+    valorLimitado = parseFloat(valorLimitado.toFixed(2));
+    
+    // 4. Corrección visual: Si el valor original ingresado es diferente al valor limitado,
+    // o si el usuario usó una coma, forzamos la corrección visual en el input.
+    if (valor !== valorLimitado || input.value.includes(',')) {
+        let displayValue = valorLimitado.toFixed(2);
+        // Mantenemos la coma si el usuario originalmente usó coma para la corrección visual
+        if (input.value.includes(',')) {
+            displayValue = displayValue.replace('.', ',');
+        }
+        input.value = displayValue;
     }
     
-    return valor;
+    return valorLimitado; // Retorna el valor limitado y redondeado para el cálculo
 }
 
 /**
@@ -55,10 +85,10 @@ function manejarBonificaciones(idMarcado) {
         ciscoInput.disabled = bonificado;
         blackbInput.disabled = bonificado;
 
-        // Si están bloqueados por bonificación, resetear sus valores a 0 
+        // Si están bloqueados por bonificación, resetear sus valores a vacío (visual y cálculo)
         if (bonificado) {
-            ciscoInput.value = 0;
-            blackbInput.value = 0;
+            ciscoInput.value = '';
+            blackbInput.value = '';
         }
     }
 
@@ -71,7 +101,7 @@ function manejarBonificaciones(idMarcado) {
  * @param {boolean} bloquear - True para bloquear, False para desbloquear.
  */
 function manejarBloqueoTotal(bloquear) {
-    const inputs_a_bloquear = ['cisco', 'exblackb', 'ef']; // Solo bloqueamos estas tres
+    const inputs_a_bloquear = ['cisco', 'exblackb', 'ef']; 
     const checkboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
     
     // Toggle de clase en el body
@@ -86,9 +116,9 @@ function manejarBloqueoTotal(bloquear) {
         const input = document.getElementById(id);
         if (input) {
             input.disabled = bloquear;
-            // Si estamos bloqueando, forzamos el valor a 0 para el cálculo actual
+            // Si estamos bloqueando, forzamos el valor a '' para el cálculo actual
             if (bloquear) {
-                 input.value = 0;
+                 input.value = '';
             }
         }
     });
@@ -112,6 +142,7 @@ function manejarBloqueoTotal(bloquear) {
         const bonificado = opcion3.checked || opcion2.checked;
         ciscoInput.disabled = bonificado;
         blackbInput.disabled = bonificado;
+        // Si no está bonificado, no borramos el contenido si existe, solo si está bloqueado.
     }
 }
 
@@ -209,6 +240,9 @@ function calcularPromedio() {
     document.getElementById('mensajeAyuda').innerHTML = ''; 
     document.getElementById('analisisEsperanza').innerHTML = '';
     document.getElementById('mensajeMinimoM1').innerHTML = '';
+    
+    // Solo se limpia el bono EF si NO aplica en el nuevo cálculo (se maneja en obtenerNotasAjustadas)
+    
     const estadoElement = document.getElementById('estadoAprobacion');
     estadoElement.classList.remove('aprobado', 'desaprobado', 'simulacion');
     estadoElement.textContent = '';
@@ -274,7 +308,8 @@ function calcularPromedio() {
     const opcion2 = document.getElementById('opcion2cursos');
     const hayBonificacion = opcion3.checked || opcion2.checked;
     
-    let notasFaltantes = PA2_val === 0 || EF === 0; // EF es la nota base (sin bono)
+    // Chequeamos si alguna nota clave del M2 es 0, lo que indica simulación
+    let notasFaltantes = PA2_val === 0 || EF === 0; 
 
     if (!hayBonificacion) {
         // Solo chequeamos CISCO/BLACKB si no hay bonificación
@@ -313,7 +348,7 @@ function calcularPFMaximoParcial(M1, PA2, Nota_PA3_Max_Chequeo) {
     let M2_Maximo_Parcial = 0;
     
     // 1. Considerar PA2 (30% de M2)
-    M2_Maximo_Parcial += PA2 * 0.30;
+    M2_Maximo_Parcial += obtenerValor('pa2') * 0.30;
     
     // 2. Considerar PA3 (10% de M2) - Usamos Nota_PA3_Max_Chequeo (20) para el análisis de bloqueo
     M2_Maximo_Parcial += Nota_PA3_Max_Chequeo * 0.10;
@@ -353,7 +388,6 @@ function simularAprobacionM1(M1) {
 
 function mostrarMensajeAyudaFinal(M1, PF_Necesario, puedeAprobar = true) {
     const contenedor = document.getElementById('mensajeAyuda');
-    const Nota_PA3_Ajustada = obtenerNotasAjustadas().Nota_PA3_Ajustada;
     
     if (puedeAprobar) {
         const M2_Requerido = (13.5 * 2) - M1; 
@@ -383,14 +417,17 @@ function limpiarCampos() {
     // Desbloqueo primero para asegurar que todos los campos se reseteeen
     manejarBloqueoTotal(false);
     
-    document.querySelectorAll('input[type="number"]').forEach(input => {
-        input.value = 0;
+    // Los campos de texto se resetean a vacío ('')
+    document.querySelectorAll('input[type="text"]').forEach(input => {
+        input.value = '';
         input.disabled = false;
     });
     document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
         checkbox.checked = false;
         checkbox.disabled = false;
     });
+    
+    // Ejecutamos calcularPromedio aquí para que la UI se actualice a 0.00 en todos los resultados
     calcularPromedio(); 
 }
 
@@ -400,10 +437,12 @@ function limpiarCampos() {
 // -------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Permite que el cálculo se actualice al cambiar cualquier nota o checkbox
-    document.querySelectorAll('input').forEach(input => {
-        input.addEventListener('input', calcularPromedio);
+    // 1. Agregar listeners a todos los inputs para la reactividad
+    document.querySelectorAll('input[type="text"]').forEach(input => {
+        // El evento 'input' se dispara en cada cambio de valor
+        input.addEventListener('input', calcularPromedio); 
     });
-    // Cálculo inicial al cargar la página
-    calcularPromedio();
+    
+    // 2. Inicializar la calculadora
+    limpiarCampos(); 
 });
